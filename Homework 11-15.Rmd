@@ -1,0 +1,132 @@
+---
+title: "Scraping Data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(usethis)
+```
+
+```{r}
+use_git_config(user.name = "RoanFM", user.email = "roan.floermartinez522@gmail.com")
+```
+```{r}
+library(tidyverse)
+library(rvest) 
+library(robotstxt) 
+library(formattable)
+```
+
+Exercise 1.1 Find the correct selectors for the following fields. Make sure that each matches 762 results:
+
+Course Number
+Course Name
+Day
+Time
+Room
+Instructor
+Avail. / Max
+General Education Requirements (make sure you only match 762; beware of the Mac copyright banner at the bottom of the page!)
+Description Then, put all this information into one data frame. Do not include any extraneous information like “Instructor:”.
+
+```{r}
+fall2017 <- read_html("https://www.macalester.edu/registrar/schedules/2017fall/class-schedule/#crs10008")
+
+
+course_nums <- 
+  fall2017 %>%
+  html_nodes(".class-schedule-course-number") %>%
+  html_text()
+
+course_names <- 
+  fall2017 %>%
+  html_nodes(".class-schedule-course-title") %>%
+  html_text()
+
+course_days <- fall2017 %>%
+  html_nodes("td.class-schedule-label:nth-child(3)") %>% 
+  html_text() %>% 
+  str_sub(start = 7)
+  
+course_time <- fall2017 %>% 
+  html_nodes("td.class-schedule-label:nth-child(4)") %>%
+  html_text() %>% 
+  str_sub(start = 7)
+  
+course_room <- fall2017 %>% 
+  html_nodes("td.class-schedule-label:nth-child(5)") %>%
+  html_text() %>% 
+  str_sub(start = 7)
+  
+course_instructor <- fall2017 %>% 
+  html_nodes("td.class-schedule-label:nth-child(6)") %>%
+  html_text() %>% 
+  str_sub(start = 13)
+
+course_av <- fall2017 %>% 
+  html_nodes("td.class-schedule-label:nth-child(7)") %>%
+  html_text() %>% 
+  str_sub(start = 14)
+
+course_ger <- fall2017 %>% 
+  html_nodes("div.expandable p:nth-child(2)") %>%
+  html_text() %>% 
+  str_sub(start = 61)
+
+  
+course_descriptios <- fall2017 %>% 
+  html_nodes("div.expandable p:nth-child(1)") %>%
+  html_text() %>% 
+  str_sub(start = 30)
+```
+```{r}
+
+
+
+course_df <- tibble(number=course_nums, name=course_names, day=course_days, time=course_time, room=course_room, instructor=course_instructor, avil_max=course_av, general_education_requirement=course_ger, description=course_descriptios)
+
+course_df
+```
+
+First six rows of the data frame
+```{r}
+formattable(head(course_df),align =c("c", "c"), list(`Indicator Name` = formatter("span", style =~style(color = "black",font.weight = "bold"))))
+```
+
+```{r fig.height=4, fig.width=14}
+course <- course_df %>%  
+  separate(number, into = c("department", "number", "section")) 
+
+course %>% 
+  group_by(department) %>% 
+  summarise(n=n()) %>% 
+  ggplot(aes(x=department, y=n))+
+  geom_col()
+```
+
+
+
+Exercise 1.3 Analyze the typical length of course names by department. To do so, create a dplyr pipeline that creates a new data table based on your courses data table, with the following changes:
+
+New columns for the length of the title of a course and the length of the description of the course. Hint: str_length.
+Remove departments that have fewer than 10 sections of courses. To do so, group by department, then remove observations in groups with fewer than 10 sections (Hint: use filter with n()). Then ungroup the data.
+Create a visualization of the differences across groups in lengths of course names or course descriptions. Think carefully about the visualization you should be using!
+
+```{r}
+course_analysis <- course %>% 
+  mutate(title_len = str_length(name)) %>% 
+  group_by(department) %>% 
+  filter(n()>=10) %>% 
+  ungroup() 
+
+course_analysis%>% 
+  ggplot(aes(x=department, y=title_len))+
+  geom_boxplot()+
+  theme_classic()
+```
+
+
